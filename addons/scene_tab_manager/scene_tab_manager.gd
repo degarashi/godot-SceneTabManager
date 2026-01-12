@@ -11,7 +11,7 @@ func _enter_tree() -> void:
 	var settings := EditorInterface.get_editor_settings()
 
 	# Define default priority weights based on keywords
-	var default_weights: Dictionary[String, int] = {
+	var default_weights: Dictionary = {
 		"title": 50,
 		"level_base": 30,
 		"player": 10,
@@ -62,11 +62,15 @@ func _get_keyword_weights() -> Dictionary[String,int]:
 	var cleaned_weights: Dictionary[String, int] = {}
 	if val is Dictionary:
 		var dict_val: Dictionary = val
-		for k in dict_val.keys():
-			# Force type conversion during retrieval for safety
-			var key_str := str(k)
-			var val_int := int(dict_val[k])
-			cleaned_weights[key_str] = val_int
+		for key in dict_val.keys():
+			# check key-type for safety
+			if not key is String:
+				push_error(
+					"SceneTabManager: Keyword weights dictionary contains a non-string key: ", key
+				)
+				continue
+			var val_int := int(dict_val[key])
+			cleaned_weights[key] = val_int
 
 	return cleaned_weights
 
