@@ -69,8 +69,16 @@ func _get_keyword_weights() -> Dictionary[String,int]:
 					"SceneTabManager: Keyword weights dictionary contains a non-string key: ", key
 				)
 				continue
+
+			var key_str: String = key
+			if key_str.strip_edges() == "":
+				push_warning(
+					"SceneTabManager: Keyword weights contain an empty or whitespace-only key. Skipping."
+				)
+				continue
+
 			var val_int := int(dict_val[key])
-			cleaned_weights[key] = val_int
+			cleaned_weights[key_str] = val_int
 
 	return cleaned_weights
 
