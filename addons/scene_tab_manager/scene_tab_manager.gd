@@ -8,7 +8,7 @@ var _toolbar_button: Button
 
 
 func _enter_tree() -> void:
-	var settings: EditorSettings = get_editor_interface().get_editor_settings()
+	var settings := EditorInterface.get_editor_settings()
 
 	# Define default priority weights based on keywords
 	var default_weights: Dictionary[String, int] = {
@@ -32,7 +32,7 @@ func _enter_tree() -> void:
 
 	# Add a button to the toolbar
 	_toolbar_button = Button.new()
-	var editor_base := get_editor_interface().get_base_control()
+	var editor_base := EditorInterface.get_base_control()
 	var scene_icon := editor_base.get_theme_icon("Folder", "EditorIcons")
 
 	_toolbar_button.icon = scene_icon
@@ -56,7 +56,7 @@ func _on_button_pressed() -> void:
 
 # Retrieves keyword and score pairs from editor settings in a type-safe manner
 func _get_keyword_weights() -> Dictionary[String,int]:
-	var settings: EditorSettings = get_editor_interface().get_editor_settings()
+	var settings := EditorInterface.get_editor_settings()
 	var val: Variant = settings.get_setting(SETTING_PATH)
 
 	var cleaned_weights: Dictionary[String, int] = {}
@@ -107,13 +107,12 @@ class SortEnt:
 
 
 func _organize_tabs() -> void:
-	var interface := get_editor_interface()
-	var tab_bar := _find_scene_tab_bar(interface.get_base_control())
+	var tab_bar := _find_scene_tab_bar(EditorInterface.get_base_control())
 
 	if not tab_bar:
 		return
 
-	var scene_paths := interface.get_open_scenes()
+	var scene_paths := EditorInterface.get_open_scenes()
 	if scene_paths.size() <= 1:
 		return
 
@@ -124,13 +123,13 @@ func _organize_tabs() -> void:
 	# Sort in descending order of priority (higher score first)
 	entries.sort_custom(func(a: SortEnt, b: SortEnt) -> bool: return a.priority > b.priority)
 
-	var prev_opened_scene := interface.get_edited_scene_root().scene_file_path
+	var prev_opened_scene := EditorInterface.get_edited_scene_root().scene_file_path
 
 	# Execute tab rearrangement
 	for i in range(entries.size()):
 		await get_tree().create_timer(0.05).timeout
 
-		var current_paths := interface.get_open_scenes()
+		var current_paths := EditorInterface.get_open_scenes()
 		var target_path := entries[i].path
 
 		var from_idx: int = -1
@@ -143,16 +142,15 @@ func _organize_tabs() -> void:
 			_move_tab_to(from_idx, i, tab_bar)
 
 	# Restore the previously active scene
-	interface.open_scene_from_path(prev_opened_scene)
+	EditorInterface.open_scene_from_path(prev_opened_scene)
 
 
 func _move_tab_to(from_idx: int, to_idx: int, tab_bar: TabBar) -> void:
 	if from_idx == to_idx:
 		return
 
-	var ifc: EditorInterface = get_editor_interface()
-	var scene_paths: PackedStringArray = ifc.get_open_scenes()
+	var scene_paths := EditorInterface.get_open_scenes()
 
-	ifc.open_scene_from_path(scene_paths[from_idx])
+	EditorInterface.open_scene_from_path(scene_paths[from_idx])
 	tab_bar.move_tab(from_idx, to_idx)
 	tab_bar.active_tab_rearranged.emit(to_idx)
