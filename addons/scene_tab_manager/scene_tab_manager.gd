@@ -127,7 +127,8 @@ func _organize_tabs() -> void:
 
 	# Execute tab rearrangement
 	for i in range(entries.size()):
-		await get_tree().create_timer(0.05).timeout
+		# Wait slightly to stabilize processing
+		await get_tree().process_frame
 
 		var current_paths := EditorInterface.get_open_scenes()
 		var target_path := entries[i].path
