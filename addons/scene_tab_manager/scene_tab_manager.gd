@@ -87,10 +87,9 @@ func _find_scene_tab_bar(node: Node) -> TabBar:
 
 
 # Calculates priority based on the scene path
-func _calc_priority(path: String) -> int:
+func _calc_priority(path: String, weights: Dictionary[String, int]) -> int:
 	var score := 0
 	var file_name := path.get_file()
-	var weights := _get_keyword_weights()
 
 	# Add points based on keyword matching
 	for key in weights.keys():
@@ -120,9 +119,11 @@ func _organize_tabs() -> void:
 	if scene_paths.size() <= 1:
 		return
 
+	# load weights
+	var weights := _get_keyword_weights()
 	var entries: Array[SortEnt] = []
 	for path in scene_paths:
-		entries.append(SortEnt.new(path, _calc_priority(path)))
+		entries.append(SortEnt.new(path, _calc_priority(path, weights)))
 
 	# Sort in descending order of priority (higher score first)
 	entries.sort_custom(func(a: SortEnt, b: SortEnt) -> bool: return a.priority > b.priority)
