@@ -39,6 +39,8 @@ Click the **Organize** button (with the folder icon) located in the top toolbar 
 | `level_base` | 30
 | `player` | 10
 
+![Settings](doc_images/settings.jpg)
+
 ## Technical Details & Limitations
 
 * This plugin only sorts scene tabs that are currently **open** in the editor.
