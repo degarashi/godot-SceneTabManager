@@ -60,7 +60,7 @@ func _input(event: InputEvent) -> void:
 	# Only detect key press (not release)
 	if key_event.pressed and not key_event.echo:
 		# Check if Alt is pressed
-		if key_event.alt_pressed:
+		if key_event.alt_pressed and not key_event.shift_pressed and not key_event.ctrl_pressed:
 			# Number keys 1 (KEY_1) to 9 (KEY_9)
 			if key_event.keycode >= KEY_1 and key_event.keycode <= KEY_9:
 				# Switch to 2D-View
