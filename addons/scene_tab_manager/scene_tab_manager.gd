@@ -63,6 +63,8 @@ func _input(event: InputEvent) -> void:
 		if key_event.alt_pressed:
 			# Number keys 1 (KEY_1) to 9 (KEY_9)
 			if key_event.keycode >= KEY_1 and key_event.keycode <= KEY_9:
+				# Switch to 2D-View
+				EditorInterface.set_main_screen_editor("2D")
 				var index: int = int(key_event.keycode) - int(KEY_1)
 				_activate_tab_by_index(index)
 
