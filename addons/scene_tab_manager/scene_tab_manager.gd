@@ -136,7 +136,10 @@ func _organize_tabs() -> void:
 	# Sort in descending order of priority (higher score first)
 	entries.sort_custom(func(a: SortEnt, b: SortEnt) -> bool: return a.priority > b.priority)
 
-	var prev_opened_scene := EditorInterface.get_edited_scene_root().scene_file_path
+	var current_root := EditorInterface.get_edited_scene_root()
+	var prev_opened_scene := ""
+	if current_root:
+		prev_opened_scene = current_root.scene_file_path
 
 	# Execute tab rearrangement
 	for i in range(entries.size()):
@@ -155,8 +158,8 @@ func _organize_tabs() -> void:
 		if from_idx != -1 and from_idx != i:
 			_move_tab_to(from_idx, i, tab_bar)
 
-	# Restore the previously active scene
-	EditorInterface.open_scene_from_path(prev_opened_scene)
+	if prev_opened_scene != "":
+		EditorInterface.open_scene_from_path(prev_opened_scene)
 
 
 func _move_tab_to(from_idx: int, to_idx: int, tab_bar: TabBar) -> void:
