@@ -50,6 +50,32 @@ func _exit_tree() -> void:
 		_toolbar_button.queue_free()
 
 
+# Use _input instead of _shortcut_input
+func _input(event: InputEvent) -> void:
+	if not event is InputEventKey:
+		return
+
+	var key_event := event as InputEventKey
+
+	# Only detect key press (not release)
+	if key_event.pressed and not key_event.echo:
+		# Check if Alt is pressed
+		if key_event.alt_pressed:
+			# Number keys 1 (KEY_1) to 9 (KEY_9)
+			if key_event.keycode >= KEY_1 and key_event.keycode <= KEY_9:
+				var index: int = int(key_event.keycode) - int(KEY_1)
+				_activate_tab_by_index(index)
+
+				# Consume input to prevent other editor actions
+				get_viewport().set_input_as_handled()
+
+
+func _activate_tab_by_index(index: int) -> void:
+	var scene_paths := EditorInterface.get_open_scenes()
+	if index >= 0 and index < scene_paths.size():
+		EditorInterface.open_scene_from_path(scene_paths[index])
+
+
 func _on_button_pressed() -> void:
 	_organize_tabs()
 
