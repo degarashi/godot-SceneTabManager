@@ -1,5 +1,7 @@
 # Scene Tab Manager for Godot 4.x
 
+[日本語版 (Japanese)](README.ja.md)
+
 **Scene Tab Manager** is an editor plugin that automatically organizes the numerous open scene tabs in the Godot Editor based on predefined keyword priorities (weights).
 
 It solves the common issue in large projects where important scenes—such as the main menu, player, or common base levels—get buried under a sea of other open tabs.
