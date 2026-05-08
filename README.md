@@ -10,6 +10,7 @@ It solves the common issue in large projects where important scenes—such as th
 * **Easy Customization**: Change keyword and score pairs directly from the **Editor Settings** to match your project's needs.
 * **One-Click Operation**: Instantly organize your tabs by clicking the "Organize" button added to the 2D/3D viewport toolbar.
 * **Smart Restoration**: Automatically returns focus to the scene you were originally working on after the sorting process is complete.
+* **Quick File Locate (Alt+Click)**: Hold the **Alt** key while clicking on a scene tab, a node in the Scene tree, or a resource in the Inspector to immediately reveal that file in the **FileSystem** dock.
 
 ## Installation
 
@@ -40,6 +41,14 @@ Click the **Organize** button (with the folder icon) located in the top toolbar 
 | `player` | 10
 
 ![Settings](doc_images/settings.jpg)
+
+### 3. Quick File Locate
+Hold the **Alt** key and click on any of the following to reveal the corresponding file in the **FileSystem** dock:
+* **Scene Tabs**: Select the tab while holding Alt.
+* **Nodes in Scene Tree**: If the node is a saved scene (instanced), it will be highlighted.
+* **Resources in Inspector**: Click on a resource property (like a texture, script, or material).
+
+---
 
 ## Technical Details & Limitations
 
