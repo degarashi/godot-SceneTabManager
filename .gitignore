@@ -13,3 +13,4 @@ export_credentials.cfg
 
 # Crash dumps and logs
 *.log
+/android/
