@@ -4,10 +4,12 @@ extends EditorPlugin
 # Path for the configuration setting
 const SETTING_PATH: String = "editors/plugins/scene_tab_manager/keyword_weights"
 
+static var _log := DLoggerClass.new("SceneTabManager")
 var _toolbar_button: Button
 
 
 func _enter_tree() -> void:
+	_log.info("Plugin initialized.")
 	var settings := EditorInterface.get_editor_settings()
 
 	# Define default priority weights based on keywords
@@ -75,6 +77,7 @@ func _input(event: InputEvent) -> void:
 func _activate_tab_by_index(index: int) -> void:
 	var scene_paths := EditorInterface.get_open_scenes()
 	if index >= 0 and index < scene_paths.size():
+		_log.debug("Activating tab {0}: {1}", [index, scene_paths[index]])
 		EditorInterface.open_scene_from_path(scene_paths[index])
 
 
@@ -93,16 +96,12 @@ func _get_keyword_weights() -> Dictionary[String,int]:
 		for key in dict_val.keys():
 			# check key-type for safety
 			if not key is String:
-				push_error(
-					"SceneTabManager: Keyword weights dictionary contains a non-string key: ", key
-				)
+				_log.error("Keyword weights dictionary contains a non-string key: {0}", [key])
 				continue
 
 			var key_str: String = key
 			if key_str.strip_edges() == "":
-				push_warning(
-					"SceneTabManager: Keyword weights contain an empty or whitespace-only key. Skipping."
-				)
+				_log.warn("Keyword weights contain an empty or whitespace-only key. Skipping.")
 				continue
 
 			var val_int := int(dict_val[key])
@@ -146,13 +145,16 @@ class SortEnt:
 
 
 func _organize_tabs() -> void:
+	_log.info("Starting tab organization.")
 	var tab_bar := _find_scene_tab_bar(EditorInterface.get_base_control())
 
 	if not tab_bar:
+		_log.warn("Could not find scene tab bar.")
 		return
 
 	var scene_paths := EditorInterface.get_open_scenes()
 	if scene_paths.size() <= 1:
+		_log.debug("Not enough scenes open to organize.")
 		return
 
 	# load weights
@@ -188,6 +190,8 @@ func _organize_tabs() -> void:
 
 	if prev_opened_scene != "":
 		EditorInterface.open_scene_from_path(prev_opened_scene)
+
+	_log.info("Tab organization completed.")
 
 
 func _move_tab_to(from_idx: int, to_idx: int, tab_bar: TabBar) -> void:
