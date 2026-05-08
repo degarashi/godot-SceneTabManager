@@ -1,13 +1,20 @@
 @tool
 extends EditorPlugin
 
+# ------------- [Constants] -------------
 # Path for the configuration setting
 const SETTING_PATH: String = "editors/plugins/scene_tab_manager/keyword_weights"
+const _OPERATE_DELAY: float = 0.25
 
+# ------------- [Static Variable] -------------
 static var _log := DLoggerClass.new("SceneTabManager")
+
+# ------------- [Private Variable] -------------
 var _toolbar_button: Button
+var _last_operated: float = 0.0
 
 
+# ------------- [Callbacks] -------------
 func _enter_tree() -> void:
 	_log.info("Plugin initialized.")
 	var settings := EditorInterface.get_editor_settings()
@@ -45,11 +52,24 @@ func _enter_tree() -> void:
 
 	add_control_to_container(CONTAINER_CANVAS_EDITOR_MENU, _toolbar_button)
 
+	# Connect to inspector signals for Alt-click feature
+	var insp := EditorInterface.get_inspector()
+	insp.edited_object_changed.connect(_on_inspector_obj_changed)
+	insp.property_selected.connect(_on_inspector_property_selected)
+
 
 func _exit_tree() -> void:
 	if _toolbar_button:
 		remove_control_from_container(CONTAINER_CANVAS_EDITOR_MENU, _toolbar_button)
 		_toolbar_button.queue_free()
+
+	# Disconnect inspector signals
+	var insp := EditorInterface.get_inspector()
+	if insp:
+		if insp.edited_object_changed.is_connected(_on_inspector_obj_changed):
+			insp.edited_object_changed.disconnect(_on_inspector_obj_changed)
+		if insp.property_selected.is_connected(_on_inspector_property_selected):
+			insp.property_selected.disconnect(_on_inspector_property_selected)
 
 
 # Use _input instead of _shortcut_input
@@ -74,15 +94,37 @@ func _input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 
 
+func _on_button_pressed() -> void:
+	_organize_tabs()
+
+
+func _on_inspector_obj_changed() -> void:
+	if _is_alt_only_pressed():
+		var obj := EditorInterface.get_inspector().get_edited_object()
+		var node := obj as Node
+		if node:
+			var path := node.scene_file_path
+			if not path.is_empty():
+				_open_in_file_system(path)
+
+
+func _on_inspector_property_selected(property: String) -> void:
+	if _is_alt_only_pressed():
+		var obj := EditorInterface.get_inspector().get_edited_object()
+		if not obj:
+			return
+		var val: Variant = obj.get(property)
+		var res := val as Resource
+		if res and not res.resource_path.is_empty():
+			_open_in_file_system(res.resource_path)
+
+
+# ------------- [Private Method] -------------
 func _activate_tab_by_index(index: int) -> void:
 	var scene_paths := EditorInterface.get_open_scenes()
 	if index >= 0 and index < scene_paths.size():
 		_log.debug("Activating tab {0}: {1}", [index, scene_paths[index]])
 		EditorInterface.open_scene_from_path(scene_paths[index])
-
-
-func _on_button_pressed() -> void:
-	_organize_tabs()
 
 
 # Retrieves keyword and score pairs from editor settings in a type-safe manner
@@ -133,15 +175,6 @@ func _calc_priority(path: String, weights: Dictionary[String, int]) -> int:
 			score += weight
 
 	return score
-
-
-class SortEnt:
-	var path: String
-	var priority: int
-
-	func _init(p: String, pr: int) -> void:
-		path = p
-		priority = pr
 
 
 func _organize_tabs() -> void:
@@ -203,3 +236,44 @@ func _move_tab_to(from_idx: int, to_idx: int, tab_bar: TabBar) -> void:
 	EditorInterface.open_scene_from_path(scene_paths[from_idx])
 	tab_bar.move_tab(from_idx, to_idx)
 	tab_bar.active_tab_rearranged.emit(to_idx)
+
+
+func _is_alt_only_pressed() -> bool:
+	# Check if only alt key is pressed (no Shift, Ctrl, or Meta/Command)
+	var is_alt_only := (
+		Input.is_key_pressed(KEY_ALT)
+		and not Input.is_key_pressed(KEY_SHIFT)
+		and not Input.is_key_pressed(KEY_CTRL)
+		and not Input.is_key_pressed(KEY_META)
+	)
+
+	if not is_alt_only:
+		return false
+
+	# Check if number keys 0~9 are NOT pressed (to avoid conflict with tab switching)
+	for i in range(10):
+		if Input.is_key_pressed(KEY_0 + i):
+			return false
+
+	return true
+
+
+func _open_in_file_system(path: String) -> void:
+	# Prevent double-triggering
+	var now := Time.get_unix_time_from_system()
+	if now - _last_operated < _OPERATE_DELAY:
+		return
+	_last_operated = now
+
+	_log.debug("Opening in FileSystem: {0}", [path])
+	EditorInterface.select_file(path)
+
+
+# ------------- [Private Class] -------------
+class SortEnt:
+	var path: String
+	var priority: int
+
+	func _init(p: String, pr: int) -> void:
+		path = p
+		priority = pr
