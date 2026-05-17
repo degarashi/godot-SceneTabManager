@@ -57,6 +57,9 @@ func _enter_tree() -> void:
 	insp.edited_object_changed.connect(_on_inspector_obj_changed)
 	insp.property_selected.connect(_on_inspector_property_selected)
 
+	# Connect to filesystem signals
+	EditorInterface.get_resource_filesystem().filesystem_changed.connect(_on_filesystem_changed)
+
 
 func _exit_tree() -> void:
 	if _toolbar_button:
@@ -70,6 +73,11 @@ func _exit_tree() -> void:
 			insp.edited_object_changed.disconnect(_on_inspector_obj_changed)
 		if insp.property_selected.is_connected(_on_inspector_property_selected):
 			insp.property_selected.disconnect(_on_inspector_property_selected)
+
+	# Disconnect filesystem signals
+	var efs := EditorInterface.get_resource_filesystem()
+	if efs and efs.filesystem_changed.is_connected(_on_filesystem_changed):
+		efs.filesystem_changed.disconnect(_on_filesystem_changed)
 
 
 # Use _input instead of _shortcut_input
@@ -119,7 +127,57 @@ func _on_inspector_property_selected(property: String) -> void:
 			_open_in_file_system(res.resource_path)
 
 
+func _on_filesystem_changed() -> void:
+	_log.debug("filesystem_changed detected.")
+
+	# Wait a bit longer to ensure the editor has processed the file deletion
+	await get_tree().create_timer(0.2).timeout
+
+	var open_scenes := EditorInterface.get_open_scenes()
+	if open_scenes.is_empty():
+		_log.debug("No scenes open.")
+		return
+
+	var to_close: Array[int] = []
+	for i in range(open_scenes.size()):
+		var path := open_scenes[i]
+		# Check both FileAccess and ResourceLoader for existence
+		var exists := FileAccess.file_exists(path)
+		if not exists:
+			_log.info("File missing: {0}", [path])
+			to_close.append(i)
+
+	if to_close.is_empty():
+		return
+
+	var tab_bar := _find_scene_tab_bar(EditorInterface.get_base_control())
+	if not tab_bar:
+		_log.warn("Could not find the scene TabBar.")
+		# For debugging, we can still use a helper to log structure but via _log
+		_log_all_tab_bars(EditorInterface.get_base_control())
+		return
+
+	# Close from highest index to lowest to avoid index shifting
+	to_close.sort()
+	to_close.reverse()
+	for index in to_close:
+		_log.info("Closing tab index: {0} ({1})", [index, open_scenes[index]])
+		tab_bar.tab_close_pressed.emit(index)
+
+
 # ------------- [Private Method] -------------
+func _log_all_tab_bars(node: Node) -> void:
+	if node is TabBar:
+		var tb := node as TabBar
+		_log.debug(
+			"  - TabBar: {0} (tabs: {1}) Parent: {2}", [tb.name, tb.tab_count, tb.get_parent().name]
+		)
+		if tb.tab_count > 0:
+			_log.debug("    First tab: {0}", [tb.get_tab_title(0)])
+	for child in node.get_children():
+		_log_all_tab_bars(child)
+
+
 func _activate_tab_by_index(index: int) -> void:
 	var scene_paths := EditorInterface.get_open_scenes()
 	if index >= 0 and index < scene_paths.size():
@@ -155,7 +213,24 @@ func _get_keyword_weights() -> Dictionary[String,int]:
 # Locates the TabBar node from the Editor's UI tree
 func _find_scene_tab_bar(node: Node) -> TabBar:
 	if node is TabBar:
-		return node as TabBar
+		var tb := node as TabBar
+		var open_scenes := EditorInterface.get_open_scenes()
+
+		if tb.tab_count == open_scenes.size() and tb.tab_count > 0:
+			# Scene tabs often have "*" prefix if unsaved, but the base name should match
+			var first_tab_title := tb.get_tab_title(0).replace("*", "")
+			var first_scene_name := open_scenes[0].get_file()
+
+			if first_tab_title == first_scene_name:
+				return tb
+			else:
+				# Sometimes the title is truncated or has other decorations
+				if (
+					first_scene_name.begins_with(first_tab_title)
+					or first_tab_title.begins_with(first_scene_name.get_basename())
+				):
+					return tb
+
 	for child in node.get_children():
 		var found := _find_scene_tab_bar(child)
 		if found:
