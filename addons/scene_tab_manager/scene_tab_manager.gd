@@ -11,6 +11,9 @@ static var _log := DLoggerClass.new("SceneTabManager")
 
 # ------------- [Private Variable] -------------
 var _toolbar_button: Button
+var _popup_menu: PopupMenu
+var _settings_proxy: RefCounted
+var _reset_confirm_dialog: ConfirmationDialog
 var _last_operated: float = 0.0
 
 
@@ -20,11 +23,7 @@ func _enter_tree() -> void:
 	var settings := EditorInterface.get_editor_settings()
 
 	# Define default priority weights based on keywords
-	var default_weights: Dictionary = {
-		"title": 50,
-		"level_base": 30,
-		"player": 10,
-	}
+	var default_weights := _get_default_weights()
 
 	if not settings.has_setting(SETTING_PATH):
 		settings.set_setting(SETTING_PATH, default_weights)
@@ -46,11 +45,27 @@ func _enter_tree() -> void:
 
 	_toolbar_button.icon = scene_icon
 	_toolbar_button.text = "Organize"
-	_toolbar_button.tooltip_text = "Sort scene tabs based on keyword weights"
+	_toolbar_button.tooltip_text = "Sort scene tabs (Right-click for settings)"
 	_toolbar_button.flat = true
 	_toolbar_button.pressed.connect(_on_button_pressed)
+	_toolbar_button.gui_input.connect(_on_button_gui_input)
 
 	add_control_to_container(CONTAINER_CANVAS_EDITOR_MENU, _toolbar_button)
+
+	# Setup PopupMenu
+	_popup_menu = PopupMenu.new()
+	_popup_menu.add_item("Organize Tabs", 0)
+	_popup_menu.add_separator()
+	_popup_menu.add_item("Edit Keyword Weights...", 1)
+	_popup_menu.add_item("Reset to Default", 2)
+	_popup_menu.id_pressed.connect(_on_menu_id_pressed)
+	_toolbar_button.add_child(_popup_menu)
+
+	# Setup confirmation dialog for reset
+	_reset_confirm_dialog = ConfirmationDialog.new()
+	_reset_confirm_dialog.dialog_text = "Reset keyword weights to default?"
+	_reset_confirm_dialog.confirmed.connect(_on_reset_confirmed)
+	_toolbar_button.add_child(_reset_confirm_dialog)
 
 	# Connect to inspector signals for Alt-click feature
 	var insp := EditorInterface.get_inspector()
@@ -104,6 +119,35 @@ func _input(event: InputEvent) -> void:
 
 func _on_button_pressed() -> void:
 	_organize_tabs()
+
+
+func _on_button_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
+			_popup_menu.set_position(
+				_toolbar_button.get_screen_position() + Vector2(0, _toolbar_button.get_size().y)
+			)
+			_popup_menu.popup()
+
+
+func _on_menu_id_pressed(id: int) -> void:
+	match id:
+		0:  # Organize Tabs
+			_organize_tabs()
+		1:  # Edit Keyword Weights
+			_settings_proxy = SettingsProxy.new()
+			_settings_proxy.keyword_weights = _get_keyword_weights()
+			EditorInterface.inspect_object(_settings_proxy)
+		2:  # Reset to Default
+			_reset_confirm_dialog.popup_centered()
+
+
+func _on_reset_confirmed() -> void:
+	var settings := EditorInterface.get_editor_settings()
+	var default_weights := _get_default_weights()
+	settings.set_setting(SETTING_PATH, default_weights)
+	_log.info("Keyword weights reset to default.")
 
 
 func _on_inspector_obj_changed() -> void:
@@ -252,6 +296,14 @@ func _calc_priority(path: String, weights: Dictionary[String, int]) -> int:
 	return score
 
 
+func _get_default_weights() -> Dictionary:
+	return {
+		"title": 50,
+		"level_base": 30,
+		"player": 10,
+	}
+
+
 func _organize_tabs() -> void:
 	_log.info("Starting tab organization.")
 	var tab_bar := _find_scene_tab_bar(EditorInterface.get_base_control())
@@ -345,6 +397,14 @@ func _open_in_file_system(path: String) -> void:
 
 
 # ------------- [Private Class] -------------
+class SettingsProxy:
+	extends RefCounted
+	@export var keyword_weights: Dictionary[String, int]:
+		set(val):
+			keyword_weights = val
+			EditorInterface.get_editor_settings().set_setting(SETTING_PATH, val)
+
+
 class SortEnt:
 	var path: String
 	var priority: int
