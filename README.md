@@ -9,8 +9,9 @@ It solves the common issue in large projects where important scenes—such as th
 ## Key Features
 
 * **Keyword-Based Sorting**: Calculates a priority score based on keywords in the scene's filename (e.g., `Player`, `Main`, `Level`) and sorts them in descending order.
-* **Easy Customization**: Change keyword and score pairs directly from the **Editor Settings** to match your project's needs.
+* **Easy Customization**: Change keyword and score pairs directly from the **Editor Settings** or via the button's context menu.
 * **One-Click Operation**: Instantly organize your tabs by clicking the "Organize" button added to the 2D/3D viewport toolbar.
+* **Context Menu**: Right-click the Organize button to quickly access settings or reset them to default.
 * **Smart Restoration**: Automatically returns focus to the scene you were originally working on after the sorting process is complete.
 * **Quick File Locate (Alt+Click)**: Hold the **Alt** key while clicking on a scene tab, a node in the Scene tree, or a resource in the Inspector to immediately reveal that file in the **FileSystem** dock.
 
@@ -27,13 +28,26 @@ Click the **Organize** button (with the folder icon) located in the top toolbar 
 
 ![Organize Button Location](doc_images/info_icon0.jpg)
 
+### 2. Quick Settings Access (Right-Click)
+Right-click the **Organize** button to open a context menu with the following options:
 
-### 2. Configuring Priorities
-1.  Open **Editor -> Editor Settings**.
-2.  Navigate to the **Editors -> Plugins -> Scene Tab Manager** section.
-3.  Edit the `Keyword Weights` dictionary to set your preferred keywords and scores.
-    * **Key (String)**: The keyword to search for (case-insensitive).
-    * **Value (Integer)**: The priority score. Higher values will place the tab further to the left.
+![Context Menu](doc_images/context_menu.jpg)
+
+* **Organize Tabs**: Performs the same action as a left-click.
+* **Edit Keyword Weights...**: Opens the weight settings directly in the **Inspector** for quick editing without opening the Editor Settings dialog.
+* **Reset to Default**: Reverts all keyword weights to their initial values (requires confirmation).
+
+### 3. Configuring Priorities
+You can configure priorities in two ways:
+1.  **Via Context Menu**: Right-click the Organize button and select **Edit Keyword Weights...**. The settings will appear in the Inspector.
+2.  **Via Editor Settings**:
+    * Open **Editor -> Editor Settings**.
+    * Navigate to the **Editors -> Plugins -> Scene Tab Manager** section.
+    * Edit the `Keyword Weights` dictionary.
+
+#### Keyword Weights Configuration:
+* **Key (String)**: The keyword to search for (case-insensitive).
+* **Value (Integer)**: The priority score. Higher values will place the tab further to the left.
 
 #### Default Setting Example:
 | Keyword | Score
@@ -44,7 +58,7 @@ Click the **Organize** button (with the folder icon) located in the top toolbar 
 
 ![Settings](doc_images/settings.jpg)
 
-### 3. Quick File Locate
+### 4. Quick File Locate
 Hold the **Alt** key and click on any of the following to reveal the corresponding file in the **FileSystem** dock:
 * **Scene Tabs**: Select the tab while holding Alt.
 * **Nodes in Scene Tree**: If the node is a saved scene (instanced), it will be highlighted.
