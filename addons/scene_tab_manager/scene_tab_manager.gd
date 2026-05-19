@@ -342,16 +342,10 @@ func _get_connections_tooltip(node: Node, detailed: bool) -> String:
 	for sig in node.get_signal_list():
 		var sig_name: String = sig.name
 		for conn in node.get_signal_connection_list(sig_name):
-			# Filter: Default (not detailed) shows only non-internal/non-persistent connections
-			# In editor, user-defined connections in tscn usually don't have CONNECT_INHERITED or CONNECT_PERSISTENT
-			# depending on how they are queried, but usually we check if target is in the same scene or has a script.
+			# Filter: Default (not detailed) shows only connections registered in tscn (persistent)
 			if not detailed:
-				var flags: int = conn.flags
-				# Simple heuristic: internal engine connections often have specific flags or no script target
-				var target_obj: Object = conn.callable.get_object()
-				if not target_obj or not target_obj.get_script():
+				if not (conn.flags & CONNECT_PERSIST):
 					continue
-
 			var target: Object = conn.callable.get_object()
 			var method: StringName = conn.callable.get_method()
 			var target_name: String = target.name if target is Node else str(target)
@@ -365,8 +359,7 @@ func _get_connections_tooltip(node: Node, detailed: bool) -> String:
 	var incoming: Array[String] = []
 	for conn in node.get_incoming_connections():
 		if not detailed:
-			var source_obj: Object = conn.signal.get_object()
-			if not source_obj or not source_obj.get_script():
+			if not (conn.flags & CONNECT_PERSIST):
 				continue
 
 		var sig: Signal = conn.signal
@@ -376,10 +369,6 @@ func _get_connections_tooltip(node: Node, detailed: bool) -> String:
 		# because they are already shown in the Signals section above.
 		if source == node:
 			continue
-
-		if not detailed:
-			if not source or not source.get_script():
-				continue
 
 		var source_name: String = source.name if source is Node else str(source)
 		var target_method: StringName = conn.callable.get_method()
