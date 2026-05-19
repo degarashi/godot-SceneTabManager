@@ -5,6 +5,7 @@ extends EditorPlugin
 # Path for the configuration setting
 const SETTING_PATH: String = "editors/plugins/scene_tab_manager/keyword_weights"
 const _OPERATE_DELAY: float = 0.25
+const _TOOLTIP_UPDATE_INTERVAL: float = 0.1
 
 # ------------- [Static Variable] -------------
 static var _log := DLoggerClass.new("SceneTabManager")
@@ -18,6 +19,7 @@ var _last_operated: float = 0.0
 var _scene_tree_control: Tree
 var _last_hovered_item: TreeItem
 var _last_ctrl_state: bool = false
+var _tooltip_timer: float = 0.0
 
 
 # ------------- [Callbacks] -------------
@@ -102,8 +104,11 @@ func _exit_tree() -> void:
 		efs.filesystem_changed.disconnect(_on_filesystem_changed)
 
 
-func _process(_delta: float) -> void:
-	_update_scene_tree_tooltip()
+func _process(delta: float) -> void:
+	_tooltip_timer += delta
+	if _tooltip_timer >= _TOOLTIP_UPDATE_INTERVAL:
+		_tooltip_timer = 0.0
+		_update_scene_tree_tooltip()
 
 
 # Use _input instead of _shortcut_input
