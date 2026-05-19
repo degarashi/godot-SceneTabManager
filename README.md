@@ -13,6 +13,7 @@ It solves the common issue in large projects where important scenes—such as th
 * **One-Click Operation**: Instantly organize your tabs by clicking the "Organize" button added to the 2D/3D viewport toolbar.
 * **Context Menu**: Right-click the Organize button to quickly access settings or reset them to default.
 * **Smart Restoration**: Automatically returns focus to the scene you were originally working on after the sorting process is complete.
+* **Signal Connection Tooltip**: Hover over any node in the **Scene Tree** to see its signal connections (Signals/Outgoing and Incoming) in a tooltip.
 * **Quick File Locate (Alt+Click)**: Hold the **Alt** key while clicking on a scene tab, a node in the Scene tree, or a resource in the Inspector to immediately reveal that file in the **FileSystem** dock.
 
 ## Installation
@@ -64,6 +65,15 @@ Hold the **Alt** key and click on any of the following to reveal the correspondi
 * **Nodes in Scene Tree**: If the node is a saved scene (instanced), it will be highlighted.
 * **Resources in Inspector**: Click on a resource property (like a texture, script, or material).
 
+### 5. Signal Connection Tooltip
+Hover your mouse over a node in the **Scene Tree** dock to instantly see its signal connections:
+
+* **Signals (Outgoing)**: Shows where this node's signals are connected to.
+* **Incoming**: Shows which nodes are sending signals to this node.
+* **Detail Control**:
+    * **Default View**: Shows only connections involving objects with scripts (usually user-defined).
+    * **Detailed View (Hold Ctrl)**: Shows all connections, including internal engine/inherited ones.
+
 ---
 
 ## Technical Details & Limitations
@@ -71,6 +81,7 @@ Hold the **Alt** key and click on any of the following to reveal the correspondi
 * This plugin only sorts scene tabs that are currently **open** in the editor.
 * During the reorganization process, each scene is briefly set as active; however, the focus is restored to your original scene once finished.
 * To ensure stability even with a large number of tabs, a tiny delay (0.05s) is applied between tab movements.
+* The signal tooltip updates at an optimized interval (0.1s) to ensure editor performance remains smooth.
 
 ---
 
