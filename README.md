@@ -71,7 +71,7 @@ Hover your mouse over a node in the **Scene Tree** dock to instantly see its sig
 * **Signals (Outgoing)**: Shows where this node's signals are connected to.
 * **Incoming**: Shows which nodes are sending signals to this node.
 * **Detail Control**:
-    * **Default View**: Shows only connections involving objects with scripts (usually user-defined).
+    * **Default View**: Shows only connections registered in the `.tscn` file (persistent connections).
     * **Detailed View (Hold Ctrl)**: Shows all connections, including internal engine/inherited ones.
 
 ---
