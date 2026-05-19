@@ -15,11 +15,14 @@ var _popup_menu: PopupMenu
 var _settings_proxy: RefCounted
 var _reset_confirm_dialog: ConfirmationDialog
 var _last_operated: float = 0.0
+var _scene_tree_control: Tree
+var _last_hovered_item: TreeItem
 
 
 # ------------- [Callbacks] -------------
 func _enter_tree() -> void:
 	_log.info("Plugin initialized.")
+	_find_and_setup_scene_tree()
 	var settings := EditorInterface.get_editor_settings()
 
 	# Define default priority weights based on keywords
@@ -81,6 +84,9 @@ func _exit_tree() -> void:
 		remove_control_from_container(CONTAINER_CANVAS_EDITOR_MENU, _toolbar_button)
 		_toolbar_button.queue_free()
 
+	_scene_tree_control = null
+	_last_hovered_item = null
+
 	# Disconnect inspector signals
 	var insp := EditorInterface.get_inspector()
 	if insp:
@@ -93,6 +99,10 @@ func _exit_tree() -> void:
 	var efs := EditorInterface.get_resource_filesystem()
 	if efs and efs.filesystem_changed.is_connected(_on_filesystem_changed):
 		efs.filesystem_changed.disconnect(_on_filesystem_changed)
+
+
+func _process(_delta: float) -> void:
+	_update_scene_tree_tooltip()
 
 
 # Use _input instead of _shortcut_input
@@ -210,6 +220,176 @@ func _on_filesystem_changed() -> void:
 
 
 # ------------- [Private Method] -------------
+func _find_and_setup_scene_tree() -> void:
+	if _scene_tree_control and is_instance_valid(_scene_tree_control):
+		return
+
+	var base := EditorInterface.get_base_control()
+	# Try to find by name directly first (more efficient)
+	_scene_tree_control = base.find_child("SceneTree", true, false) as Tree
+
+	if not _scene_tree_control:
+		_scene_tree_control = _find_scene_tree_recursive(base)
+
+	if _scene_tree_control:
+		_log.info("Found SceneTree control: {0}", [_scene_tree_control.get_path()])
+	else:
+		# This is a fallback to see what's available
+		_log.warn("SceneTree control NOT found. Searching for any Tree...")
+		_find_any_tree(base)
+
+
+func _find_any_tree(node: Node) -> void:
+	if node is Tree:
+		_log.debug("Found a Tree: {0} (parent: {1})", [node.name, node.get_parent().name])
+	for child in node.get_children():
+		_find_any_tree(child)
+
+
+func _find_scene_tree_recursive(node: Node) -> Tree:
+	if node is Tree:
+		if node.name == "SceneTree":
+			return node
+
+		# In some Godot versions, it might be named differently but under a specific dock
+		var parent := node.get_parent()
+		if (
+			parent
+			and (parent.name.contains("SceneTree") or parent.get_class().contains("SceneTree"))
+		):
+			return node
+
+	for child in node.get_children():
+		var found := _find_scene_tree_recursive(child)
+		if found:
+			return found
+	return null
+
+
+func _update_scene_tree_tooltip() -> void:
+	if not _scene_tree_control or not is_instance_valid(_scene_tree_control):
+		_find_and_setup_scene_tree()
+		if not _scene_tree_control:
+			return
+
+	if not _scene_tree_control.is_visible_in_tree():
+		return
+
+	var mouse_pos := _scene_tree_control.get_local_mouse_position()
+	if (
+		mouse_pos.x < 0
+		or mouse_pos.y < 0
+		or mouse_pos.x > _scene_tree_control.size.x
+		or mouse_pos.y > _scene_tree_control.size.y
+	):
+		return
+
+	var item := _scene_tree_control.get_item_at_position(mouse_pos)
+	if item == _last_hovered_item:
+		# Keep setting it to prevent internal overrides
+		if item:
+			_apply_tooltip(item)
+		return
+
+	_last_hovered_item = item
+
+	if not item:
+		return
+
+	_apply_tooltip(item)
+
+
+func _apply_tooltip(item: TreeItem) -> void:
+	var target_node: Variant = item.get_metadata(0)
+
+	if target_node == null:
+		for i in range(1, 3):
+			var m: Variant = item.get_metadata(i)
+			if m != null:
+				target_node = m
+				break
+
+	var node: Node = null
+
+	if target_node is Node:
+		node = target_node
+	elif target_node is NodePath:
+		var path := target_node as NodePath
+		var root := EditorInterface.get_edited_scene_root()
+		if root:
+			node = root.get_node_or_null(path)
+			if not node:
+				# Try absolute path if it looks like one
+				node = root.get_tree().root.get_node_or_null(path)
+
+	if not node:
+		if target_node != null:
+			_log.debug(
+				"Metadata 0 is {0} (type: {1}, value: {2})",
+				[type_string(typeof(target_node)), typeof(target_node), str(target_node)]
+			)
+		return
+
+	if not is_instance_valid(node):
+		return
+
+	var tooltip := _get_connections_tooltip(node)
+
+	if item.get_tooltip_text(0) != tooltip:
+		for i in range(_scene_tree_control.columns):
+			item.set_tooltip_text(i, tooltip)
+
+		_scene_tree_control.tooltip_text = tooltip
+		_log.debug("Updated tooltip for: {0}", [node.name])
+
+
+func _get_connections_tooltip(node: Node) -> String:
+	var lines: Array[String] = []
+	lines.append("Node: {0} ({1})".format([node.name, node.get_class()]))
+
+	# Outgoing connections (Signals from this node)
+	var outgoing: Array[String] = []
+	for sig in node.get_signal_list():
+		var sig_name: String = sig.name
+		for conn in node.get_signal_connection_list(sig_name):
+			var target: Object = conn.callable.get_object()
+			var method: StringName = conn.callable.get_method()
+			var target_name: String = target.name if target is Node else str(target)
+			outgoing.append("  • {0} -> {1}::{2}".format([sig_name, target_name, method]))
+
+	if not outgoing.is_empty():
+		lines.append("\nSignals:")
+		lines.append_array(outgoing)
+
+	# Incoming connections (Connections to this node)
+	var incoming: Array[String] = []
+	for conn in node.get_incoming_connections():
+		var sig: Signal = conn.signal
+		var source: Object = sig.get_object()
+
+		# Optimization: Filter out self-connections from Incoming section
+		# because they are already shown in the Signals section above.
+		if source == node:
+			continue
+
+		if not detailed:
+			if not source or not source.get_script():
+				continue
+
+		var source_name: String = source.name if source is Node else str(source)
+		var target_method: StringName = conn.callable.get_method()
+		incoming.append("  • {0}::{1} -> {2}".format([source_name, sig.get_name(), target_method]))
+
+	if not incoming.is_empty():
+		lines.append("\nIncoming:")
+		lines.append_array(incoming)
+
+	if outgoing.is_empty() and incoming.is_empty():
+		return "Node: {0}\n(No signal connections)".format([node.name])
+
+	return "\n".join(lines)
+
+
 func _log_all_tab_bars(node: Node) -> void:
 	if node is TabBar:
 		var tb := node as TabBar
@@ -230,7 +410,7 @@ func _activate_tab_by_index(index: int) -> void:
 
 
 # Retrieves keyword and score pairs from editor settings in a type-safe manner
-func _get_keyword_weights() -> Dictionary[String,int]:
+func _get_keyword_weights() -> Dictionary[String, int]:
 	var settings := EditorInterface.get_editor_settings()
 	var val: Variant = settings.get_setting(SETTING_PATH)
 
