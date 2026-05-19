@@ -17,6 +17,7 @@ var _reset_confirm_dialog: ConfirmationDialog
 var _last_operated: float = 0.0
 var _scene_tree_control: Tree
 var _last_hovered_item: TreeItem
+var _last_ctrl_state: bool = false
 
 
 # ------------- [Callbacks] -------------
@@ -232,18 +233,9 @@ func _find_and_setup_scene_tree() -> void:
 		_scene_tree_control = _find_scene_tree_recursive(base)
 
 	if _scene_tree_control:
-		_log.info("Found SceneTree control: {0}", [_scene_tree_control.get_path()])
+		_log.info("Found SceneTree control.")
 	else:
-		# This is a fallback to see what's available
-		_log.warn("SceneTree control NOT found. Searching for any Tree...")
-		_find_any_tree(base)
-
-
-func _find_any_tree(node: Node) -> void:
-	if node is Tree:
-		_log.debug("Found a Tree: {0} (parent: {1})", [node.name, node.get_parent().name])
-	for child in node.get_children():
-		_find_any_tree(child)
+		_log.warn("SceneTree control NOT found.")
 
 
 func _find_scene_tree_recursive(node: Node) -> Tree:
@@ -285,21 +277,22 @@ func _update_scene_tree_tooltip() -> void:
 		return
 
 	var item := _scene_tree_control.get_item_at_position(mouse_pos)
-	if item == _last_hovered_item:
-		# Keep setting it to prevent internal overrides
-		if item:
-			_apply_tooltip(item)
+	var is_ctrl_pressed := Input.is_key_pressed(KEY_CTRL)
+
+	# We use a combined state to check if update is needed
+	if item == _last_hovered_item and _last_ctrl_state == is_ctrl_pressed:
 		return
 
 	_last_hovered_item = item
+	_last_ctrl_state = is_ctrl_pressed
 
 	if not item:
 		return
 
-	_apply_tooltip(item)
+	_apply_tooltip(item, is_ctrl_pressed)
 
 
-func _apply_tooltip(item: TreeItem) -> void:
+func _apply_tooltip(item: TreeItem, detailed: bool) -> void:
 	var target_node: Variant = item.get_metadata(0)
 
 	if target_node == null:
@@ -319,39 +312,41 @@ func _apply_tooltip(item: TreeItem) -> void:
 		if root:
 			node = root.get_node_or_null(path)
 			if not node:
-				# Try absolute path if it looks like one
 				node = root.get_tree().root.get_node_or_null(path)
 
-	if not node:
-		if target_node != null:
-			_log.debug(
-				"Metadata 0 is {0} (type: {1}, value: {2})",
-				[type_string(typeof(target_node)), typeof(target_node), str(target_node)]
-			)
+	if not node or not is_instance_valid(node):
 		return
 
-	if not is_instance_valid(node):
-		return
+	var tooltip := _get_connections_tooltip(node, detailed)
 
-	var tooltip := _get_connections_tooltip(node)
+	# We always apply if tooltip changed or if we need to ensure it's set
+	for i in range(_scene_tree_control.columns):
+		item.set_tooltip_text(i, tooltip)
 
-	if item.get_tooltip_text(0) != tooltip:
-		for i in range(_scene_tree_control.columns):
-			item.set_tooltip_text(i, tooltip)
-
-		_scene_tree_control.tooltip_text = tooltip
-		_log.debug("Updated tooltip for: {0}", [node.name])
+	_scene_tree_control.tooltip_text = tooltip
 
 
-func _get_connections_tooltip(node: Node) -> String:
+func _get_connections_tooltip(node: Node, detailed: bool) -> String:
 	var lines: Array[String] = []
 	lines.append("Node: {0} ({1})".format([node.name, node.get_class()]))
+	if not detailed:
+		lines[0] += " [Ctrl for detail]"
 
 	# Outgoing connections (Signals from this node)
 	var outgoing: Array[String] = []
 	for sig in node.get_signal_list():
 		var sig_name: String = sig.name
 		for conn in node.get_signal_connection_list(sig_name):
+			# Filter: Default (not detailed) shows only non-internal/non-persistent connections
+			# In editor, user-defined connections in tscn usually don't have CONNECT_INHERITED or CONNECT_PERSISTENT
+			# depending on how they are queried, but usually we check if target is in the same scene or has a script.
+			if not detailed:
+				var flags: int = conn.flags
+				# Simple heuristic: internal engine connections often have specific flags or no script target
+				var target_obj: Object = conn.callable.get_object()
+				if not target_obj or not target_obj.get_script():
+					continue
+
 			var target: Object = conn.callable.get_object()
 			var method: StringName = conn.callable.get_method()
 			var target_name: String = target.name if target is Node else str(target)
@@ -364,6 +359,11 @@ func _get_connections_tooltip(node: Node) -> String:
 	# Incoming connections (Connections to this node)
 	var incoming: Array[String] = []
 	for conn in node.get_incoming_connections():
+		if not detailed:
+			var source_obj: Object = conn.signal.get_object()
+			if not source_obj or not source_obj.get_script():
+				continue
+
 		var sig: Signal = conn.signal
 		var source: Object = sig.get_object()
 
