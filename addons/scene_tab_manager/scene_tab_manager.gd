@@ -7,6 +7,8 @@ const SETTING_PATH: String = "editors/plugins/scene_tab_manager/keyword_weights"
 const _OPERATE_DELAY: float = 0.25
 const _TOOLTIP_UPDATE_INTERVAL: float = 0.1
 const SHIFT_DOUBLE_TAP_THRESHOLD: int = 300
+const MAX_RECENT_FILES: int = 15
+const RECENT_FILES_SETTING: String = "editors/plugins/scene_tab_manager/recent_files"
 
 # ------------- [Static Variable] -------------
 static var _log := DLoggerClass.new("SceneTabManager")
@@ -22,6 +24,7 @@ var _last_hovered_item: TreeItem
 var _last_ctrl_state: bool = false
 var _tooltip_timer: float = 0.0
 var _last_shift_pressed: int = 0
+var _recent_files: Array[String] = []
 
 
 # ------------- [Callbacks] -------------
@@ -83,6 +86,18 @@ func _enter_tree() -> void:
 	# Connect to filesystem signals
 	EditorInterface.get_resource_filesystem().filesystem_changed.connect(_on_filesystem_changed)
 
+	# Connect for Recent Files feature
+	scene_changed.connect(_on_scene_changed)
+	EditorInterface.get_script_editor().editor_script_changed.connect(_on_script_changed)
+
+	# Load recent files
+	if settings.has_setting(RECENT_FILES_SETTING):
+		var saved: Variant = settings.get_setting(RECENT_FILES_SETTING)
+		if saved is Array:
+			for item in saved:
+				if item is String:
+					_recent_files.append(item)
+
 
 func _exit_tree() -> void:
 	if _toolbar_button:
@@ -139,6 +154,18 @@ func _input(event: InputEvent) -> void:
 	# Reset double-tap if any other key is pressed
 	if key_event.pressed:
 		_last_shift_pressed = 0
+
+	# Ctrl+E for Recent Files
+	if key_event.pressed and not key_event.echo:
+		if (
+			key_event.ctrl_pressed
+			and key_event.keycode == KEY_E
+			and not key_event.shift_pressed
+			and not key_event.alt_pressed
+		):
+			_show_recent_files()
+			get_viewport().set_input_as_handled()
+			return
 
 	# Only detect key press (not release)
 	if key_event.pressed and not key_event.echo:
@@ -416,6 +443,81 @@ func _log_all_tab_bars(node: Node) -> void:
 			_log.debug("    First tab: {0}", [tb.get_tab_title(0)])
 	for child in node.get_children():
 		_log_all_tab_bars(child)
+
+
+func _on_scene_changed(root: Node) -> void:
+	if not root:
+		return
+	_add_to_recent_files(root.scene_file_path)
+
+
+func _on_script_changed(script: Script) -> void:
+	if not script:
+		return
+	_add_to_recent_files(script.resource_path)
+
+
+func _add_to_recent_files(path: String) -> void:
+	if path.is_empty() or path.begins_with("local://"):
+		return
+
+	# Remove if already exists to move to top
+	var idx := _recent_files.find(path)
+	if idx != -1:
+		_recent_files.remove_at(idx)
+
+	_recent_files.push_front(path)
+
+	# Limit size
+	if _recent_files.size() > MAX_RECENT_FILES:
+		_recent_files.resize(MAX_RECENT_FILES)
+
+	# Save to settings
+	EditorInterface.get_editor_settings().set_setting(RECENT_FILES_SETTING, _recent_files)
+
+
+func _show_recent_files() -> void:
+	if _recent_files.is_empty():
+		_log.info("No recent files.")
+		return
+
+	var popup := PopupMenu.new()
+	var base := EditorInterface.get_base_control()
+	base.add_child(popup)
+
+	for i in range(_recent_files.size()):
+		var path := _recent_files[i]
+		var file_name := path.get_file()
+		var dir := path.get_base_dir().replace("res://", "")
+		var icon: Texture2D
+
+		if path.ends_with(".tscn") or path.ends_with(".scn"):
+			icon = base.get_theme_icon("PackedScene", "EditorIcons")
+		elif path.ends_with(".gd"):
+			icon = base.get_theme_icon("GDScript", "EditorIcons")
+		else:
+			icon = base.get_theme_icon("Resource", "EditorIcons")
+
+		popup.add_icon_item(icon, "{0} ({1})".format([file_name, dir]), i)
+
+	popup.id_pressed.connect(
+		func(id: int):
+			var path := _recent_files[id]
+			if path.ends_with(".tscn") or path.ends_with(".scn"):
+				EditorInterface.open_scene_from_path(path)
+			else:
+				var res := ResourceLoader.load(path)
+				if res:
+					EditorInterface.edit_resource(res)
+			popup.queue_free()
+	)
+
+	popup.popup_hide.connect(func(): popup.queue_free())
+
+	var screen_rect := base.get_viewport_rect()
+	var popup_size := popup.get_contents_minimum_size()
+	popup.set_position(Vector2i(screen_rect.size / 2.0) - Vector2i(popup_size / 2.0))
+	popup.popup()
 
 
 func _on_double_shift_pressed() -> void:
