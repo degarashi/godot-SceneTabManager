@@ -3,7 +3,8 @@ class_name RecentFilesManager
 extends RefCounted
 
 # ------------- [Constants] -------------
-const RECENT_FILES_SETTING: String = "editors/plugins/scene_tab_manager/recent_files"
+const RECENT_FILES_SECTION: String = "scene_tab_manager"
+const RECENT_FILES_KEY: String = "recent_files"
 const MAX_RECENT_FILES: int = 15
 
 # ------------- [Private Variable] -------------
@@ -96,7 +97,9 @@ func add_to_recent_files(path: String) -> void:
 	if _recent_files.size() > MAX_RECENT_FILES:
 		_recent_files.resize(MAX_RECENT_FILES)
 
-	EditorInterface.get_editor_settings().set_setting(RECENT_FILES_SETTING, _recent_files)
+	EditorInterface.get_editor_settings().set_project_metadata(
+		RECENT_FILES_SECTION, RECENT_FILES_KEY, _recent_files
+	)
 
 
 func is_popup_visible() -> bool:
@@ -115,9 +118,9 @@ func get_recent_files_count() -> int:
 # ------------- [Private Method] -------------
 func _load_recent_files() -> void:
 	var settings := EditorInterface.get_editor_settings()
-	if settings.has_setting(RECENT_FILES_SETTING):
-		var saved: Variant = settings.get_setting(RECENT_FILES_SETTING)
-		if saved is Array:
-			for item in saved:
-				if item is String:
-					_recent_files.append(item)
+	var saved: Variant = settings.get_project_metadata(RECENT_FILES_SECTION, RECENT_FILES_KEY, [])
+
+	if saved is Array:
+		for item in saved:
+			if item is String:
+				_recent_files.append(item)
