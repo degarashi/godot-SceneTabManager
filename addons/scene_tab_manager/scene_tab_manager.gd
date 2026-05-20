@@ -4,6 +4,10 @@ extends EditorPlugin
 # ------------- [Constants] -------------
 # Path for the configuration setting
 const SETTING_PATH: String = "editors/plugins/scene_tab_manager/keyword_weights"
+const SHORTCUT_RECENT_FILES: String = "editors/plugins/scene_tab_manager/shortcuts/recent_files"
+const ENABLE_DOUBLE_SHIFT: String = "editors/plugins/scene_tab_manager/shortcuts/enable_double_shift"
+const ENABLE_ALT_TAB_SWITCHING: String = "editors/plugins/scene_tab_manager/shortcuts/enable_alt_tab_switching"
+const ENABLE_ALT_CLICK_LOCATE: String = "editors/plugins/scene_tab_manager/shortcuts/enable_alt_click_locate"
 const _OPERATE_DELAY: float = 0.25
 const _TOOLTIP_UPDATE_INTERVAL: float = 0.1
 const SHIFT_DOUBLE_TAP_THRESHOLD: int = 300
@@ -49,6 +53,18 @@ func _enter_tree() -> void:
 			"hint_string": "Keyword:Priority-Score"
 		}
 		settings.add_property_info(property_info)
+
+	# Register Shortcut Settings
+	_register_setting(
+		SHORTCUT_RECENT_FILES, "Ctrl+E", TYPE_STRING, "Shortcut for Recent Files popup"
+	)
+	_register_setting(
+		ENABLE_DOUBLE_SHIFT, true, TYPE_BOOL, "Enable double-tap Shift for Quick Open"
+	)
+	_register_setting(
+		ENABLE_ALT_TAB_SWITCHING, true, TYPE_BOOL, "Enable Alt + 1-9 for Tab Switching"
+	)
+	_register_setting(ENABLE_ALT_CLICK_LOCATE, true, TYPE_BOOL, "Enable Alt + Click to locate file")
 
 	# Add a button to the toolbar
 	_toolbar_button = Button.new()
@@ -158,7 +174,7 @@ func _input(event: InputEvent) -> void:
 
 	# Double-tap Shift detection
 	if key_event.keycode == KEY_SHIFT:
-		if key_event.pressed and not key_event.echo:
+		if _get_setting(ENABLE_DOUBLE_SHIFT) and key_event.pressed and not key_event.echo:
 			var now := Time.get_ticks_msec()
 			if now - _last_shift_pressed < SHIFT_DOUBLE_TAP_THRESHOLD:
 				_on_double_shift_pressed()
@@ -172,22 +188,22 @@ func _input(event: InputEvent) -> void:
 	if key_event.pressed:
 		_last_shift_pressed = 0
 
-	# Ctrl+E for Recent Files
+	# Shortcut for Recent Files
 	if key_event.pressed and not key_event.echo:
-		if (
-			key_event.ctrl_pressed
-			and key_event.keycode == KEY_E
-			and not key_event.shift_pressed
-			and not key_event.alt_pressed
-		):
+		if _is_shortcut_pressed(key_event, SHORTCUT_RECENT_FILES):
 			_show_recent_files()
 			get_viewport().set_input_as_handled()
 			return
 
 	# Only detect key press (not release)
 	if key_event.pressed and not key_event.echo:
-		# Check if Alt is pressed
-		if key_event.alt_pressed and not key_event.shift_pressed and not key_event.ctrl_pressed:
+		# Check if Alt is pressed for tab switching
+		if (
+			_get_setting(ENABLE_ALT_TAB_SWITCHING)
+			and key_event.alt_pressed
+			and not key_event.shift_pressed
+			and not key_event.ctrl_pressed
+		):
 			# Number keys 1 (KEY_1) to 9 (KEY_9)
 			if key_event.keycode >= KEY_1 and key_event.keycode <= KEY_9:
 				# Switch to 2D-View
@@ -220,6 +236,12 @@ func _on_menu_id_pressed(id: int) -> void:
 		1:  # Edit Keyword Weights
 			_settings_proxy = SettingsProxy.new()
 			_settings_proxy.keyword_weights = _get_keyword_weights()
+			_settings_proxy.shortcut_recent_files = _get_setting(SHORTCUT_RECENT_FILES)
+			_settings_proxy.shortcut_enable_double_shift = _get_setting(ENABLE_DOUBLE_SHIFT)
+			_settings_proxy.shortcut_enable_alt_tab_switching = _get_setting(
+				ENABLE_ALT_TAB_SWITCHING
+			)
+			_settings_proxy.shortcut_enable_alt_click_locate = _get_setting(ENABLE_ALT_CLICK_LOCATE)
 			EditorInterface.inspect_object(_settings_proxy)
 		2:  # Reset to Default
 			_reset_confirm_dialog.popup_centered()
@@ -233,7 +255,7 @@ func _on_reset_confirmed() -> void:
 
 
 func _on_inspector_obj_changed() -> void:
-	if _is_alt_only_pressed():
+	if _get_setting(ENABLE_ALT_CLICK_LOCATE) and _is_alt_only_pressed():
 		var obj := EditorInterface.get_inspector().get_edited_object()
 		var node := obj as Node
 		if node:
@@ -243,7 +265,7 @@ func _on_inspector_obj_changed() -> void:
 
 
 func _on_inspector_property_selected(property: String) -> void:
-	if _is_alt_only_pressed():
+	if _get_setting(ENABLE_ALT_CLICK_LOCATE) and _is_alt_only_pressed():
 		var obj := EditorInterface.get_inspector().get_edited_object()
 		if not obj:
 			return
@@ -292,6 +314,37 @@ func _on_filesystem_changed() -> void:
 
 
 # ------------- [Private Method] -------------
+func _register_setting(
+	path: String, default_value: Variant, type: int, hint_string: String = ""
+) -> void:
+	var settings := EditorInterface.get_editor_settings()
+	if not settings.has_setting(path):
+		settings.set_setting(path, default_value)
+		settings.set_initial_value(path, default_value, false)
+
+		var property_info: Dictionary = {
+			"name": path, "type": type, "hint": PROPERTY_HINT_NONE, "hint_string": hint_string
+		}
+		settings.add_property_info(property_info)
+
+
+func _get_setting(path: String, default: Variant = null) -> Variant:
+	var settings := EditorInterface.get_editor_settings()
+	if settings.has_setting(path):
+		return settings.get_setting(path)
+	return default
+
+
+func _is_shortcut_pressed(event: InputEventKey, setting_path: String) -> bool:
+	var shortcut_str: String = _get_setting(setting_path, "")
+	if shortcut_str.is_empty():
+		return false
+
+	# Case-insensitive comparison of as_text()
+	# Note: InputEvent.as_text() includes modifiers like "Ctrl+E"
+	return event.as_text().to_lower() == shortcut_str.to_lower()
+
+
 func _find_and_setup_scene_tree() -> void:
 	if _scene_tree_control and is_instance_valid(_scene_tree_control):
 		return
@@ -760,6 +813,27 @@ class SettingsProxy:
 		set(val):
 			keyword_weights = val
 			EditorInterface.get_editor_settings().set_setting(SETTING_PATH, val)
+
+	@export_group("Shortcuts", "shortcut_")
+	@export var shortcut_recent_files: String:
+		set(val):
+			shortcut_recent_files = val
+			EditorInterface.get_editor_settings().set_setting(SHORTCUT_RECENT_FILES, val)
+
+	@export var shortcut_enable_double_shift: bool:
+		set(val):
+			shortcut_enable_double_shift = val
+			EditorInterface.get_editor_settings().set_setting(ENABLE_DOUBLE_SHIFT, val)
+
+	@export var shortcut_enable_alt_tab_switching: bool:
+		set(val):
+			shortcut_enable_alt_tab_switching = val
+			EditorInterface.get_editor_settings().set_setting(ENABLE_ALT_TAB_SWITCHING, val)
+
+	@export var shortcut_enable_alt_click_locate: bool:
+		set(val):
+			shortcut_enable_alt_click_locate = val
+			EditorInterface.get_editor_settings().set_setting(ENABLE_ALT_CLICK_LOCATE, val)
 
 
 class SortEnt:
