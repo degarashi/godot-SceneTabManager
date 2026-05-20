@@ -293,6 +293,10 @@ func _on_double_shift_pressed() -> void:
 				return
 			if Input.is_key_pressed(KEY_ALT):
 				EditorInterface.select_file(path)
+				var fs_dock := EditorInterface.get_file_system_dock()
+				var parent := fs_dock.get_parent()
+				if parent is TabContainer:
+					parent.current_tab = fs_dock.get_index()
 			elif path.ends_with(".tscn") or path.ends_with(".scn"):
 				EditorInterface.open_scene_from_path(path)
 			else:
