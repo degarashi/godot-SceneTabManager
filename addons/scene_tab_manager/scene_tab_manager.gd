@@ -6,6 +6,7 @@ extends EditorPlugin
 const SETTING_PATH: String = "editors/plugins/scene_tab_manager/keyword_weights"
 const _OPERATE_DELAY: float = 0.25
 const _TOOLTIP_UPDATE_INTERVAL: float = 0.1
+const SHIFT_DOUBLE_TAP_THRESHOLD: int = 300
 
 # ------------- [Static Variable] -------------
 static var _log := DLoggerClass.new("SceneTabManager")
@@ -20,6 +21,7 @@ var _scene_tree_control: Tree
 var _last_hovered_item: TreeItem
 var _last_ctrl_state: bool = false
 var _tooltip_timer: float = 0.0
+var _last_shift_pressed: int = 0
 
 
 # ------------- [Callbacks] -------------
@@ -113,10 +115,30 @@ func _process(delta: float) -> void:
 
 # Use _input instead of _shortcut_input
 func _input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed:
+		_last_shift_pressed = 0
+		return
+
 	if not event is InputEventKey:
 		return
 
 	var key_event := event as InputEventKey
+
+	# Double-tap Shift detection
+	if key_event.keycode == KEY_SHIFT:
+		if key_event.pressed and not key_event.echo:
+			var now := Time.get_ticks_msec()
+			if now - _last_shift_pressed < SHIFT_DOUBLE_TAP_THRESHOLD:
+				_on_double_shift_pressed()
+				_last_shift_pressed = 0
+				get_viewport().set_input_as_handled()
+			else:
+				_last_shift_pressed = now
+		return
+
+	# Reset double-tap if any other key is pressed
+	if key_event.pressed:
+		_last_shift_pressed = 0
 
 	# Only detect key press (not release)
 	if key_event.pressed and not key_event.echo:
@@ -394,6 +416,27 @@ func _log_all_tab_bars(node: Node) -> void:
 			_log.debug("    First tab: {0}", [tb.get_tab_title(0)])
 	for child in node.get_children():
 		_log_all_tab_bars(child)
+
+
+func _on_double_shift_pressed() -> void:
+	_log.debug("Double-tap Shift detected. Opening Quick Open Resource.")
+	var callback := func(path: String):
+		if path.is_empty():
+			return
+
+		# If Alt is held, select in FileSystem dock instead of opening
+		if Input.is_key_pressed(KEY_ALT):
+			_log.debug("Alt held. Selecting in FileSystem: {0}", [path])
+			EditorInterface.select_file(path)
+			return
+
+		var res := ResourceLoader.load(path)
+		if res is PackedScene:
+			EditorInterface.open_scene_from_path(path)
+		else:
+			EditorInterface.edit_resource(res)
+
+	EditorInterface.popup_quick_open(callback)
 
 
 func _activate_tab_by_index(index: int) -> void:
