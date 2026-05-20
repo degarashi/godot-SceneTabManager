@@ -8,8 +8,8 @@ It solves the common issue in large projects where important scenes—such as th
 
 ## Key Features
 
-* **Keyword-Based Sorting**: Calculates a priority score based on keywords in the scene's filename (e.g., `Player`, `Main`, `Level`) and sorts them in descending order.
-* **Easy Customization**: Change keyword and score pairs directly from the **Editor Settings** or via the button's context menu.
+* **Keyword-Based Sorting**: Calculates a priority score based on keywords in the scene's filename (defaults: `title`, `level_base`, `player`) and sorts them in descending order.
+* **Easy Customization**: Change keyword weights or shortcut preferences directly from the **Editor Settings** or via the button's context menu.
 * **One-Click Operation**: Instantly organize your tabs by clicking the "Organize" button added to the 2D/3D viewport toolbar.
 * **Recent Files (Ctrl+E)**: Quickly jump back to recently opened scenes or scripts using a searchable popup.
 * **Quick Open (Double-Tap Shift)**: Trigger the "Quick Open Resource" dialog by double-tapping the **Shift** key.
@@ -34,13 +34,13 @@ Click the **Organize** button (with the folder icon) located in the top toolbar 
 ### Quick Settings Access (Right-Click)
 Right-click the **Organize** button for quick actions:
 * **Organize Tabs**: Same as left-click.
-* **Edit Keyword Weights...**: Opens the weight settings in the **Inspector**.
+* **Edit Keyword Weights...**: Opens the plugin configurations (Keyword weights and Shortcuts) in the **Inspector**.
 * **Reset to Default**: Reverts all keyword weights to their initial values.
 
 ### Recent Files (Ctrl+E)
 Press **Ctrl+E** to open a popup listing your most recent files.
 * Use the **Arrow Keys** to navigate.
-* Use numeric keys **1-9** (and **0** for the 10th item) for instant selection.
+* Use numeric keys **1-9** (and **0** for the 10th item) to focus the corresponding item (press **Enter** to open).
 
 ### Quick Open (Double-Tap Shift)
 Double-tap the **Shift** key to open the resource search dialog.
@@ -59,6 +59,14 @@ Hover over a node in the **Scene Tree** to see its connections:
 * **Signals (Outgoing)**: Connections from this node.
 * **Incoming**: Connections to this node.
 * **Detailed View (Hold Ctrl)**: Shows all connections, including internal engine ones.
+
+### Configuration Settings
+All preferences can also be configured under **Editor -> Editor Settings -> Editors -> Plugins -> Scene Tab Manager**:
+* `keyword_weights`: A dictionary of keyword-weight pairs (Default: `{"title": 50, "level_base": 30, "player": 10}`).
+* `shortcuts/recent_files`: Shortcut key to open the Recent Files popup (Default: `Ctrl+E`).
+* `shortcuts/enable_double_shift`: Toggle double-tap Shift to trigger the Quick Open dialog (Default: `true`).
+* `shortcuts/enable_alt_tab_switching`: Toggle Alt + 1-9 tab switching (Default: `true`).
+* `shortcuts/enable_alt_click_locate`: Toggle Alt + Click to locate files in the FileSystem dock (Default: `true`).
 
 ---
 
