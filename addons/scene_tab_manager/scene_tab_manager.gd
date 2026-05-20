@@ -89,6 +89,7 @@ func _enter_tree() -> void:
 	# Signals
 	EditorInterface.get_inspector().edited_object_changed.connect(_on_inspector_obj_changed)
 	EditorInterface.get_inspector().property_selected.connect(_on_inspector_property_selected)
+	EditorInterface.get_inspector().resource_selected.connect(_on_inspector_resource_selected)
 	EditorInterface.get_resource_filesystem().filesystem_changed.connect(_on_filesystem_changed)
 	scene_changed.connect(_on_scene_changed)
 	EditorInterface.get_script_editor().editor_script_changed.connect(_on_script_changed)
@@ -108,6 +109,8 @@ func _exit_tree() -> void:
 			insp.edited_object_changed.disconnect(_on_inspector_obj_changed)
 		if insp.property_selected.is_connected(_on_inspector_property_selected):
 			insp.property_selected.disconnect(_on_inspector_property_selected)
+		if insp.resource_selected.is_connected(_on_inspector_resource_selected):
+			insp.resource_selected.disconnect(_on_inspector_resource_selected)
 
 	var efs := EditorInterface.get_resource_filesystem()
 	if efs and efs.filesystem_changed.is_connected(_on_filesystem_changed):
@@ -231,6 +234,12 @@ func _on_inspector_property_selected(property: String) -> void:
 			_open_in_file_system(res.resource_path)
 
 
+func _on_inspector_resource_selected(res: Resource, _prop: String) -> void:
+	if _shortcut_handler.get_setting(ENABLE_ALT_CLICK_LOCATE) and _is_alt_only_pressed():
+		if res and not res.resource_path.is_empty():
+			_open_in_file_system(res.resource_path)
+
+
 func _on_filesystem_changed() -> void:
 	await get_tree().create_timer(0.2).timeout
 	var open_scenes := EditorInterface.get_open_scenes()
@@ -341,6 +350,10 @@ func _open_in_file_system(path: String) -> void:
 		return
 	_last_operated = now
 	EditorInterface.select_file(path)
+	var fs_dock := EditorInterface.get_file_system_dock()
+	var parent := fs_dock.get_parent()
+	if parent is TabContainer:
+		parent.current_tab = fs_dock.get_index()
 
 
 # ------------- [Private Class] -------------
