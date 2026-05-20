@@ -25,6 +25,7 @@ var _last_ctrl_state: bool = false
 var _tooltip_timer: float = 0.0
 var _last_shift_pressed: int = 0
 var _recent_files: Array[String] = []
+var _recent_popup: PopupMenu
 
 
 # ------------- [Callbacks] -------------
@@ -130,6 +131,22 @@ func _process(delta: float) -> void:
 
 # Use _input instead of _shortcut_input
 func _input(event: InputEvent) -> void:
+	if _recent_popup and _recent_popup.visible:
+		if event is InputEventKey and event.pressed:
+			var key_event := event as InputEventKey
+			var key: Key = key_event.keycode
+			var idx: int = -1
+			if key >= KEY_1 and key <= KEY_9:
+				idx = int(key) - int(KEY_1)
+			elif key == KEY_0:
+				idx = 9
+
+			if idx != -1 and idx < _recent_files.size():
+				_log.debug("Numeric key {0} pressed. Focusing index {1}.", [key, idx])
+				_recent_popup.set_focused_item(idx)
+				get_viewport().set_input_as_handled()
+				return
+
 	if event is InputEventMouseButton and event.pressed:
 		_last_shift_pressed = 0
 		return
@@ -445,6 +462,21 @@ func _log_all_tab_bars(node: Node) -> void:
 		_log_all_tab_bars(child)
 
 
+func _open_recent_file_by_index(idx: int) -> void:
+	if idx < 0 or idx >= _recent_files.size():
+		return
+
+	var path := _recent_files[idx]
+	_log.debug("Opening recent file: {0}", [path])
+
+	if path.ends_with(".tscn") or path.ends_with(".scn"):
+		EditorInterface.open_scene_from_path(path)
+	else:
+		var res := ResourceLoader.load(path)
+		if res:
+			EditorInterface.edit_resource(res)
+
+
 func _on_scene_changed(root: Node) -> void:
 	if not root:
 		return
@@ -481,7 +513,12 @@ func _show_recent_files() -> void:
 		_log.info("No recent files.")
 		return
 
-	var popup := PopupMenu.new()
+	if _recent_popup:
+		_recent_popup.queue_free()
+
+	_recent_popup = PopupMenu.new()
+	var popup := _recent_popup
+	popup.exclusive = false
 	var base := EditorInterface.get_base_control()
 	base.add_child(popup)
 
@@ -498,21 +535,22 @@ func _show_recent_files() -> void:
 		else:
 			icon = base.get_theme_icon("Resource", "EditorIcons")
 
-		popup.add_icon_item(icon, "{0} ({1})".format([file_name, dir]), i)
+		var prefix := ""
+		if i < 9:
+			prefix = str(i + 1) + ". "
+		elif i == 9:
+			prefix = "0. "
 
-	popup.id_pressed.connect(
-		func(id: int):
-			var path := _recent_files[id]
-			if path.ends_with(".tscn") or path.ends_with(".scn"):
-				EditorInterface.open_scene_from_path(path)
-			else:
-				var res := ResourceLoader.load(path)
-				if res:
-					EditorInterface.edit_resource(res)
+		popup.add_icon_item(icon, "{0}{1} ({2})".format([prefix, file_name, dir]), i)
+
+	popup.id_pressed.connect(func(id: int): _open_recent_file_by_index(id))
+
+	popup.popup_hide.connect(
+		func():
 			popup.queue_free()
+			if _recent_popup == popup:
+				_recent_popup = null
 	)
-
-	popup.popup_hide.connect(func(): popup.queue_free())
 
 	var screen_rect := base.get_viewport_rect()
 	var popup_size := popup.get_contents_minimum_size()
