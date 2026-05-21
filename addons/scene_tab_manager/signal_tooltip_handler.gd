@@ -6,7 +6,7 @@ extends RefCounted
 const _TOOLTIP_UPDATE_INTERVAL: float = 0.1
 
 # ------------- [Private Variable] -------------
-var _log: RefCounted
+var _log: DLoggerClass
 var _scene_tree_control: Tree
 var _last_hovered_item: TreeItem
 var _last_ctrl_state: bool = false
@@ -14,7 +14,7 @@ var _tooltip_timer: float = 0.0
 
 
 # ------------- [Public Method] -------------
-func _init(logger: RefCounted) -> void:
+func _init(logger: DLoggerClass) -> void:
 	_log = logger
 	_find_and_setup_scene_tree()
 

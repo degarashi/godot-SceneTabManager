@@ -2,11 +2,6 @@
 extends EditorPlugin
 
 # ------------- [Constants] -------------
-const SETTING_PATH: String = "editors/plugins/scene_tab_manager/keyword_weights"
-const SHORTCUT_RECENT_FILES: String = "editors/plugins/scene_tab_manager/shortcuts/recent_files"
-const ENABLE_DOUBLE_SHIFT: String = "editors/plugins/scene_tab_manager/shortcuts/enable_double_shift"
-const ENABLE_ALT_TAB_SWITCHING: String = "editors/plugins/scene_tab_manager/shortcuts/enable_alt_tab_switching"
-const ENABLE_ALT_CLICK_LOCATE: String = "editors/plugins/scene_tab_manager/shortcuts/enable_alt_click_locate"
 const _OPERATE_DELAY: float = 0.25
 
 # ------------- [Static Variable] -------------
@@ -39,11 +34,11 @@ func _enter_tree() -> void:
 	var settings := EditorInterface.get_editor_settings()
 	var default_weights := _get_default_weights()
 
-	if not settings.has_setting(SETTING_PATH):
-		settings.set_setting(SETTING_PATH, default_weights)
-		settings.set_initial_value(SETTING_PATH, default_weights, false)
+	if not settings.has_setting(STMConstants.SETTING_PATH):
+		settings.set_setting(STMConstants.SETTING_PATH, default_weights)
+		settings.set_initial_value(STMConstants.SETTING_PATH, default_weights, false)
 		var property_info: Dictionary = {
-			"name": SETTING_PATH,
+			"name": STMConstants.SETTING_PATH,
 			"type": TYPE_DICTIONARY,
 			"hint": PROPERTY_HINT_NONE,
 			"hint_string": "Keyword:Priority-Score"
@@ -51,15 +46,17 @@ func _enter_tree() -> void:
 		settings.add_property_info(property_info)
 
 	_register_setting(
-		SHORTCUT_RECENT_FILES, "Ctrl+E", TYPE_STRING, "Shortcut for Recent Files popup"
+		STMConstants.SHORTCUT_RECENT_FILES, "Ctrl+E", TYPE_STRING, "Shortcut for Recent Files popup"
 	)
 	_register_setting(
-		ENABLE_DOUBLE_SHIFT, true, TYPE_BOOL, "Enable double-tap Shift for Quick Open"
+		STMConstants.ENABLE_DOUBLE_SHIFT, true, TYPE_BOOL, "Enable double-tap Shift for Quick Open"
 	)
 	_register_setting(
-		ENABLE_ALT_TAB_SWITCHING, true, TYPE_BOOL, "Enable Alt + 1-9 for Tab Switching"
+		STMConstants.ENABLE_ALT_TAB_SWITCHING, true, TYPE_BOOL, "Enable Alt + 1-9 for Tab Switching"
 	)
-	_register_setting(ENABLE_ALT_CLICK_LOCATE, true, TYPE_BOOL, "Enable Alt + Click to locate file")
+	_register_setting(
+		STMConstants.ENABLE_ALT_CLICK_LOCATE, true, TYPE_BOOL, "Enable Alt + Click to locate file"
+	)
 
 	# Setup UI
 	_toolbar_button = Button.new()
@@ -116,6 +113,13 @@ func _exit_tree() -> void:
 	if efs and efs.filesystem_changed.is_connected(_on_filesystem_changed):
 		efs.filesystem_changed.disconnect(_on_filesystem_changed)
 
+	if scene_changed.is_connected(_on_scene_changed):
+		scene_changed.disconnect(_on_scene_changed)
+
+	var script_editor := EditorInterface.get_script_editor()
+	if script_editor and script_editor.editor_script_changed.is_connected(_on_script_changed):
+		script_editor.editor_script_changed.disconnect(_on_script_changed)
+
 
 func _process(delta: float) -> void:
 	if _signal_tooltip_handler:
@@ -153,14 +157,14 @@ func _input(event: InputEvent) -> void:
 
 	# Shortcut for Recent Files
 	if key_event.pressed and not key_event.echo:
-		if _shortcut_handler.is_shortcut_pressed(key_event, SHORTCUT_RECENT_FILES):
+		if _shortcut_handler.is_shortcut_pressed(key_event, STMConstants.SHORTCUT_RECENT_FILES):
 			_recent_files_manager.show_recent_files()
 			get_viewport().set_input_as_handled()
 			return
 
 		# Alt + 1-9 Tab Switching
 		if (
-			_shortcut_handler.get_setting(ENABLE_ALT_TAB_SWITCHING)
+			_shortcut_handler.get_setting(STMConstants.ENABLE_ALT_TAB_SWITCHING)
 			and key_event.alt_pressed
 			and not key_event.shift_pressed
 			and not key_event.ctrl_pressed
@@ -174,91 +178,17 @@ func _input(event: InputEvent) -> void:
 			return
 
 
-func _on_button_pressed() -> void:
-	_tab_organizer.organize_tabs()
-
-
-func _on_button_gui_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton:
-		var mb := event as InputEventMouseButton
-		if mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
-			_popup_menu.set_position(
-				_toolbar_button.get_screen_position() + Vector2(0, _toolbar_button.get_size().y)
-			)
-			_popup_menu.popup()
-
-
-func _on_menu_id_pressed(id: int) -> void:
-	match id:
-		0:
-			_tab_organizer.organize_tabs()
-		1:
-			_settings_proxy = SettingsProxy.new()
-			_settings_proxy.keyword_weights = _get_keyword_weights()
-			_settings_proxy.shortcut_recent_files = _shortcut_handler.get_setting(
-				SHORTCUT_RECENT_FILES
-			)
-			_settings_proxy.shortcut_enable_double_shift = _shortcut_handler.get_setting(
-				ENABLE_DOUBLE_SHIFT
-			)
-			_settings_proxy.shortcut_enable_alt_tab_switching = _shortcut_handler.get_setting(
-				ENABLE_ALT_TAB_SWITCHING
-			)
-			_settings_proxy.shortcut_enable_alt_click_locate = _shortcut_handler.get_setting(
-				ENABLE_ALT_CLICK_LOCATE
-			)
-			EditorInterface.inspect_object(_settings_proxy)
-		2:
-			_reset_confirm_dialog.popup_centered()
-
-
-func _on_reset_confirmed() -> void:
-	EditorInterface.get_editor_settings().set_setting(SETTING_PATH, _get_default_weights())
-	_log.info("Keyword weights reset to default.")
-
-
-func _on_inspector_obj_changed() -> void:
-	if _shortcut_handler.get_setting(ENABLE_ALT_CLICK_LOCATE) and _is_alt_only_pressed():
-		var obj := EditorInterface.get_inspector().get_edited_object()
-		if obj is Node and not obj.scene_file_path.is_empty():
-			_open_in_file_system(obj.scene_file_path)
-
-
-func _on_inspector_property_selected(property: String) -> void:
-	if _shortcut_handler.get_setting(ENABLE_ALT_CLICK_LOCATE) and _is_alt_only_pressed():
-		var obj := EditorInterface.get_inspector().get_edited_object()
-		if not obj:
-			return
-		var res := obj.get(property) as Resource
-		if res and not res.resource_path.is_empty():
-			_open_in_file_system(res.resource_path)
-
-
-func _on_inspector_resource_selected(res: Resource, _prop: String) -> void:
-	if _shortcut_handler.get_setting(ENABLE_ALT_CLICK_LOCATE) and _is_alt_only_pressed():
-		if res and not res.resource_path.is_empty():
-			_open_in_file_system(res.resource_path)
-
-
-func _on_filesystem_changed() -> void:
-	await get_tree().create_timer(0.2).timeout
-	var open_scenes := EditorInterface.get_open_scenes()
-	var to_close: Array[int] = []
-	for i in range(open_scenes.size()):
-		if not FileAccess.file_exists(open_scenes[i]):
-			to_close.append(i)
-	if to_close.is_empty():
-		return
-	var tab_bar := _find_scene_tab_bar(EditorInterface.get_base_control())
-	if not tab_bar:
-		return
-	to_close.sort()
-	to_close.reverse()
-	for index in to_close:
-		tab_bar.tab_close_pressed.emit(index)
-
-
 # ------------- [Private Method] -------------
+func _maybe_locate_in_filesystem(path: String) -> void:
+	if path.is_empty():
+		return
+	if (
+		_shortcut_handler.get_setting(STMConstants.ENABLE_ALT_CLICK_LOCATE)
+		and _is_alt_only_pressed()
+	):
+		_open_in_file_system(path)
+
+
 func _register_setting(path: String, default: Variant, type: int, hint: String = "") -> void:
 	var settings := EditorInterface.get_editor_settings()
 	if not settings.has_setting(path):
@@ -267,22 +197,6 @@ func _register_setting(path: String, default: Variant, type: int, hint: String =
 		settings.add_property_info(
 			{"name": path, "type": type, "hint": PROPERTY_HINT_NONE, "hint_string": hint}
 		)
-
-
-func _find_scene_tab_bar(node: Node) -> TabBar:
-	if node is TabBar:
-		var tb := node as TabBar
-		var open_scenes := EditorInterface.get_open_scenes()
-		if tb.tab_count == open_scenes.size() and tb.tab_count > 0:
-			var title: String = tb.get_tab_title(0).replace("*", "")
-			var file := open_scenes[0].get_file()
-			if title == file or file.begins_with(title) or title.begins_with(file.get_basename()):
-				return tb
-	for child in node.get_children():
-		var found := _find_scene_tab_bar(child)
-		if found:
-			return found
-	return null
 
 
 func _on_scene_changed(root: Node) -> void:
@@ -320,7 +234,7 @@ func _activate_tab_by_index(index: int) -> void:
 
 
 func _get_keyword_weights() -> Dictionary:
-	var val: Variant = EditorInterface.get_editor_settings().get_setting(SETTING_PATH)
+	var val: Variant = EditorInterface.get_editor_settings().get_setting(STMConstants.SETTING_PATH)
 	return val if val is Dictionary else {}
 
 
@@ -356,27 +270,118 @@ func _open_in_file_system(path: String) -> void:
 		parent.current_tab = fs_dock.get_index()
 
 
+# ------------- [Callbacks] -------------
+func _on_button_pressed() -> void:
+	_tab_organizer.organize_tabs()
+
+
+func _on_button_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
+			_popup_menu.set_position(
+				_toolbar_button.get_screen_position() + Vector2(0, _toolbar_button.get_size().y)
+			)
+			_popup_menu.popup()
+
+
+func _on_menu_id_pressed(id: int) -> void:
+	match id:
+		0:
+			_tab_organizer.organize_tabs()
+		1:
+			_settings_proxy = SettingsProxy.new()
+			_settings_proxy.load_from_settings(_shortcut_handler)
+			EditorInterface.inspect_object(_settings_proxy)
+		2:
+			_reset_confirm_dialog.popup_centered()
+
+
+func _on_reset_confirmed() -> void:
+	EditorInterface.get_editor_settings().set_setting(
+		STMConstants.SETTING_PATH, _get_default_weights()
+	)
+	_log.info("Keyword weights reset to default.")
+
+
+func _on_inspector_obj_changed() -> void:
+	var obj := EditorInterface.get_inspector().get_edited_object()
+	if obj is Node:
+		_maybe_locate_in_filesystem(obj.scene_file_path)
+
+
+func _on_inspector_property_selected(property: String) -> void:
+	var obj := EditorInterface.get_inspector().get_edited_object()
+	if obj:
+		var val: Variant = obj.get(property)
+		if typeof(val) == TYPE_OBJECT:
+			var res := val as Resource
+			if res:
+				_maybe_locate_in_filesystem(res.resource_path)
+
+
+func _on_inspector_resource_selected(res: Resource, _prop: String) -> void:
+	if res:
+		_maybe_locate_in_filesystem(res.resource_path)
+
+
+func _on_filesystem_changed() -> void:
+	await get_tree().create_timer(0.2).timeout
+	var open_scenes := EditorInterface.get_open_scenes()
+	var to_close: Array[int] = []
+	for i in range(open_scenes.size()):
+		if not FileAccess.file_exists(open_scenes[i]):
+			to_close.append(i)
+	if to_close.is_empty():
+		return
+	var tab_bar := STMConstants.find_scene_tab_bar(EditorInterface.get_base_control())
+	if not tab_bar:
+		return
+	to_close.sort()
+	to_close.reverse()
+	for index in to_close:
+		tab_bar.tab_close_pressed.emit(index)
+
+
 # ------------- [Private Class] -------------
 class SettingsProxy:
 	extends RefCounted
 	@export var keyword_weights: Dictionary[String, int]:
 		set(val):
 			keyword_weights = val
-			EditorInterface.get_editor_settings().set_setting(SETTING_PATH, val)
+			EditorInterface.get_editor_settings().set_setting(STMConstants.SETTING_PATH, val)
 	@export_group("Shortcuts", "shortcut_")
 	@export var shortcut_recent_files: String:
 		set(val):
 			shortcut_recent_files = val
-			EditorInterface.get_editor_settings().set_setting(SHORTCUT_RECENT_FILES, val)
+			EditorInterface.get_editor_settings().set_setting(
+				STMConstants.SHORTCUT_RECENT_FILES, val
+			)
 	@export var shortcut_enable_double_shift: bool:
 		set(val):
 			shortcut_enable_double_shift = val
-			EditorInterface.get_editor_settings().set_setting(ENABLE_DOUBLE_SHIFT, val)
+			EditorInterface.get_editor_settings().set_setting(STMConstants.ENABLE_DOUBLE_SHIFT, val)
 	@export var shortcut_enable_alt_tab_switching: bool:
 		set(val):
 			shortcut_enable_alt_tab_switching = val
-			EditorInterface.get_editor_settings().set_setting(ENABLE_ALT_TAB_SWITCHING, val)
+			EditorInterface.get_editor_settings().set_setting(
+				STMConstants.ENABLE_ALT_TAB_SWITCHING, val
+			)
 	@export var shortcut_enable_alt_click_locate: bool:
 		set(val):
 			shortcut_enable_alt_click_locate = val
-			EditorInterface.get_editor_settings().set_setting(ENABLE_ALT_CLICK_LOCATE, val)
+			EditorInterface.get_editor_settings().set_setting(
+				STMConstants.ENABLE_ALT_CLICK_LOCATE, val
+			)
+
+	func load_from_settings(handler: ShortcutHandler) -> void:
+		var settings := EditorInterface.get_editor_settings()
+		var val: Variant = settings.get_setting(STMConstants.SETTING_PATH)
+		keyword_weights = val if val is Dictionary else {}
+
+		shortcut_recent_files = handler.get_setting(STMConstants.SHORTCUT_RECENT_FILES)
+		shortcut_enable_double_shift = handler.get_setting(STMConstants.ENABLE_DOUBLE_SHIFT)
+		shortcut_enable_alt_tab_switching = handler.get_setting(
+			STMConstants.ENABLE_ALT_TAB_SWITCHING
+		)
+		shortcut_enable_alt_click_locate = handler.get_setting(STMConstants.ENABLE_ALT_CLICK_LOCATE)

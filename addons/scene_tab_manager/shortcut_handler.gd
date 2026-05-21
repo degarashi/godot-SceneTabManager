@@ -3,19 +3,15 @@ class_name ShortcutHandler
 extends RefCounted
 
 # ------------- [Constants] -------------
-const SHORTCUT_RECENT_FILES: String = "editors/plugins/scene_tab_manager/shortcuts/recent_files"
-const ENABLE_DOUBLE_SHIFT: String = "editors/plugins/scene_tab_manager/shortcuts/enable_double_shift"
-const ENABLE_ALT_TAB_SWITCHING: String = "editors/plugins/scene_tab_manager/shortcuts/enable_alt_tab_switching"
-const ENABLE_ALT_CLICK_LOCATE: String = "editors/plugins/scene_tab_manager/shortcuts/enable_alt_click_locate"
 const SHIFT_DOUBLE_TAP_THRESHOLD: int = 300
 
 # ------------- [Private Variable] -------------
-var _log: RefCounted
+var _log: DLoggerClass
 var _last_shift_pressed: int = 0
 
 
 # ------------- [Public Method] -------------
-func _init(logger: RefCounted) -> void:
+func _init(logger: DLoggerClass) -> void:
 	_log = logger
 
 
@@ -35,7 +31,7 @@ func is_shortcut_pressed(event: InputEventKey, setting_path: String) -> bool:
 
 func handle_double_shift(event: InputEventKey, on_triggered: Callable) -> bool:
 	if event.keycode == KEY_SHIFT:
-		if get_setting(ENABLE_DOUBLE_SHIFT) and event.pressed and not event.echo:
+		if get_setting(STMConstants.ENABLE_DOUBLE_SHIFT) and event.pressed and not event.echo:
 			var now := Time.get_ticks_msec()
 			if now - _last_shift_pressed < SHIFT_DOUBLE_TAP_THRESHOLD:
 				on_triggered.call()

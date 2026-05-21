@@ -3,18 +3,16 @@ class_name RecentFilesManager
 extends RefCounted
 
 # ------------- [Constants] -------------
-const RECENT_FILES_SECTION: String = "scene_tab_manager"
-const RECENT_FILES_KEY: String = "recent_files"
 const MAX_RECENT_FILES: int = 15
 
 # ------------- [Private Variable] -------------
-var _log: RefCounted
+var _log: DLoggerClass
 var _recent_files: Array[String] = []
 var _recent_popup: PopupMenu
 
 
 # ------------- [Public Method] -------------
-func _init(logger: RefCounted) -> void:
+func _init(logger: DLoggerClass) -> void:
 	_log = logger
 	_load_recent_files()
 
@@ -98,7 +96,7 @@ func add_to_recent_files(path: String) -> void:
 		_recent_files.resize(MAX_RECENT_FILES)
 
 	EditorInterface.get_editor_settings().set_project_metadata(
-		RECENT_FILES_SECTION, RECENT_FILES_KEY, _recent_files
+		STMConstants.RECENT_FILES_SECTION, STMConstants.RECENT_FILES_KEY, _recent_files
 	)
 
 
@@ -118,7 +116,9 @@ func get_recent_files_count() -> int:
 # ------------- [Private Method] -------------
 func _load_recent_files() -> void:
 	var settings := EditorInterface.get_editor_settings()
-	var saved: Variant = settings.get_project_metadata(RECENT_FILES_SECTION, RECENT_FILES_KEY, [])
+	var saved: Variant = settings.get_project_metadata(
+		STMConstants.RECENT_FILES_SECTION, STMConstants.RECENT_FILES_KEY, []
+	)
 
 	if saved is Array:
 		for item in saved:

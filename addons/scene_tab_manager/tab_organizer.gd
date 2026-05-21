@@ -2,22 +2,19 @@
 class_name TabOrganizer
 extends RefCounted
 
-# ------------- [Constants] -------------
-const SETTING_PATH: String = "editors/plugins/scene_tab_manager/keyword_weights"
-
 # ------------- [Private Variable] -------------
-var _log: RefCounted
+var _log: DLoggerClass
 
 
 # ------------- [Public Method] -------------
-func _init(logger: RefCounted) -> void:
+func _init(logger: DLoggerClass) -> void:
 	_log = logger
 
 
 func organize_tabs() -> void:
 	_log.info("Starting tab organization.")
 	var base_control := EditorInterface.get_base_control()
-	var tab_bar := _find_scene_tab_bar(base_control)
+	var tab_bar := STMConstants.find_scene_tab_bar(base_control)
 
 	if not tab_bar:
 		_log.warn("Could not find scene tab bar.")
@@ -68,7 +65,7 @@ func organize_tabs() -> void:
 # ------------- [Private Method] -------------
 func _get_keyword_weights() -> Dictionary[String, int]:
 	var settings := EditorInterface.get_editor_settings()
-	var val: Variant = settings.get_setting(SETTING_PATH)
+	var val: Variant = settings.get_setting(STMConstants.SETTING_PATH)
 
 	var cleaned_weights: Dictionary[String, int] = {}
 	if val is Dictionary:
@@ -85,31 +82,6 @@ func _get_keyword_weights() -> Dictionary[String, int]:
 			cleaned_weights[key_str] = val_int
 
 	return cleaned_weights
-
-
-func _find_scene_tab_bar(node: Node) -> TabBar:
-	if node is TabBar:
-		var tb := node as TabBar
-		var open_scenes := EditorInterface.get_open_scenes()
-
-		if tb.tab_count == open_scenes.size() and tb.tab_count > 0:
-			var first_tab_title := tb.get_tab_title(0).replace("*", "")
-			var first_scene_name := open_scenes[0].get_file()
-
-			if first_tab_title == first_scene_name:
-				return tb
-			else:
-				if (
-					first_scene_name.begins_with(first_tab_title)
-					or first_tab_title.begins_with(first_scene_name.get_basename())
-				):
-					return tb
-
-	for child in node.get_children():
-		var found := _find_scene_tab_bar(child)
-		if found:
-			return found
-	return null
 
 
 func _calc_priority(path: String, weights: Dictionary[String, int]) -> int:
